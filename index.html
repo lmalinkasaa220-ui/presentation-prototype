@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Создание презентации — прототип</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white: #fff;
+    --accent: #5000e7;
+    --accent-border: #6900ff;
+    --chip: #1d1d1f;
+    --chip-active: #343436;
+    --setting: #191919;
+    --muted: #999;
+    --connector: #686868;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; color: var(--white); }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; background: none; border: 0; outline: none; resize: none; }
+
+  /* Экраны рисуются в масштабе макета (1440×859) и вписываются в окно */
+  .viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .stage { position: absolute; left: 50%; top: 50%; transform-origin: center; background: #000; }
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+
+  .stars { position: absolute; inset: 0; pointer-events: none; }
+  .star { position: absolute; }
+  .star img { position: absolute; display: block; width: auto; height: auto; }
+
+  .back {
+    position: absolute; left: 15px; top: 26px; width: 75px; height: 37px;
+    background: #000; border: 1px solid #a6a6a6; border-radius: 8px;
+    font-size: 14px; line-height: 20px; z-index: 2;
+  }
+  .back:hover { border-color: #fff; }
+
+  .progress { position: absolute; left: 574px; top: 45px; height: 15px; display: flex; gap: 9px; align-items: center; white-space: nowrap; z-index: 2; }
+  .progress .label { font-size: 13px; font-weight: 500; }
+  .progress .line { width: 45px; height: 1px; background: var(--connector); flex-shrink: 0; }
+  .progress img { width: 15px; height: 15px; display: block; flex-shrink: 0; }
+
+  .btn-primary {
+    background: var(--accent); border-radius: 100px; height: 43px; padding: 8px 16px;
+    font-size: 13px; font-weight: 700; line-height: 20px; color: #fff;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+  }
+  .btn-primary:hover { background: #5f14ff; }
+
+  /* 1 · Основа */
+  .form { position: absolute; left: 375px; top: 93px; width: 690px; display: flex; flex-direction: column; z-index: 1; }
+  .tabs { background: var(--chip); border-radius: 100px; height: 38px; padding: 2px; display: flex; }
+  .tab { flex: 1; border-radius: 100px; font-size: 12px; line-height: 16px; }
+  .tab.active { background: var(--chip-active); }
+  .source {
+    margin-top: 18px; background: #000; border: 1px solid var(--accent-border); border-radius: 18px;
+    box-shadow: 0 0 24px rgba(101,0,255,.21); padding: 17px 18px 18px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .entry { display: flex; align-items: center; gap: 0; height: 25px; }
+  .entry input { flex: 1; font-size: 14px; height: 25px; }
+  .entry input::placeholder, .source textarea::placeholder { color: var(--muted); }
+  .entry img { width: 14px; height: 17px; margin-right: 1px; }
+  .source textarea { height: 260px; font-size: 14px; width: 100%; }
+  .upload { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; }
+  .formats { display: flex; gap: 9px; }
+  .file { position: relative; width: 30px; height: 36px; }
+  .file img { position: absolute; inset: 0; }
+  .badge { position: absolute; left: -3px; top: 19px; padding: 1px 2px; border-radius: 1.5px; font-size: 7px; font-weight: 700; line-height: normal; }
+  .upload-link { font-size: 12px; text-decoration: underline; }
+  .settings { display: flex; gap: 7px; }
+  .setting {
+    background: var(--setting); border-radius: 100px; height: 27px; padding: 0 12px 0 13px;
+    display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 500;
+  }
+  .setting img { width: 9px; height: 5px; overflow: visible; }
+  .form .btn-primary { margin-top: 12px; }
+  .examples { margin-top: 32px; display: flex; flex-direction: column; align-items: center; gap: 11px; }
+  .examples .caption { font-size: 11px; color: #757575; }
+  .example-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .example { border: 1px solid rgba(255,255,255,.3); border-radius: 9px; padding: 8px 12px; font-size: 12px; }
+  .example:hover { border-color: rgba(255,255,255,.7); }
+
+  /* 2 · Шаблон */
+  .catalog-frame { position: absolute; left: 165px; top: 107px; width: 1110px; height: 695px; border: 1px solid var(--accent); border-radius: 18px; }
+  .categories { position: absolute; left: 230px; top: 141px; width: 982px; display: flex; flex-wrap: wrap; gap: 9px 6px; z-index: 1; }
+  .cat { background: var(--chip); border-radius: 100px; padding: 8px 13px; font-size: 12px; display: flex; gap: 4px; white-space: nowrap; }
+  .cat .count { color: #757575; }
+  .cat.active { background: #fff; color: #000; }
+  .cat.active .count { display: none; }
+  .catalog { position: absolute; left: 192px; top: 262px; width: 1056px; height: 534px; overflow-y: auto; overflow-x: hidden; z-index: 1; padding: 8px 8px 110px; scrollbar-width: none; }
+  .catalog::-webkit-scrollbar { display: none; }
+  .grid { display: flex; flex-wrap: wrap; gap: 28px 16px; width: 1040px; }
+  .card { width: 248px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; text-align: left; }
+  .cover { width: 248px; height: 139.5px; border-radius: 10px; object-fit: cover; display: block; }
+  .thumbs { display: flex; gap: 6px; }
+  .thumbs img { width: 78.66px; height: 44.25px; border-radius: 6px; object-fit: cover; border: 1.5px solid transparent; }
+  .thumbs img.active { border-color: #7a3bff; }
+  .card .title { padding-top: 4px; font-size: 14px; color: #dbdbdb; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .action-bar { position: absolute; left: 0; top: 765px; width: 1440px; height: 94px; background: #0e0e0f; border-top: 1px solid #303033; z-index: 3; }
+  .action-bar .btn-primary { position: absolute; left: 375px; top: 25px; width: 690px; }
+
+  /* Загрузка */
+  .loading { display: none; align-items: center; justify-content: center; gap: 29px; }
+  .loading.active { display: flex; }
+  .loading img { width: 245px; height: 245px; animation: spin 2.4s cubic-bezier(.6,0,.4,1) infinite; }
+  .loading p { font-size: 14px; }
+  @keyframes spin { 0% { transform: rotate(0) scale(1) } 50% { transform: rotate(45deg) scale(.9) } 100% { transform: rotate(90deg) scale(1) } }
+
+  /* 3 · Структура */
+  .structure { position: absolute; left: 430px; top: 93px; width: 580px; display: flex; flex-direction: column; gap: 9px; z-index: 1; }
+  .item { background: var(--chip); border-radius: 100px; height: 41px; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
+  .item.dragging { opacity: .4; }
+  .item .drag { width: 13px; height: 13px; cursor: grab; }
+  .item input { flex: 1; font-size: 12px; font-weight: 500; min-width: 0; text-overflow: ellipsis; }
+  .item .remove { width: 11px; height: 11px; display: flex; opacity: .8; }
+  .item .remove:hover { opacity: 1; }
+  .add { background: var(--chip); border-radius: 100px; height: 41px; display: flex; align-items: center; justify-content: center; }
+  .add:hover { background: #262628; }
+  .add img { width: 19px; height: 19px; }
+  .structure .btn-primary { margin-top: 23px; }
+  .top-continue { position: absolute; left: 1308px; top: 23px; z-index: 2; }
+
+  /* 4 · Стиль (макет-скриншот) */
+  .shot { position: absolute; inset: 0; background: #000; }
+  .shot img { position: absolute; display: block; }
+  .hotspot { position: absolute; z-index: 2; }
+  .final-img { width: 100%; height: 100%; object-fit: contain; }
+
+  .hint { position: fixed; right: 12px; bottom: 10px; font-size: 11px; color: #555; z-index: 10; }
+  .hint button { color: #888; text-decoration: underline; margin-left: 6px; }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="stage" id="stage">
+
+    <!-- 1 · Основа презентации -->
+    <section class="screen" data-screen="base" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <button class="back" data-go="base">Назад</button>
+      <div class="progress">
+        <span class="label">Основа презентации</span>
+        <span class="line"></span><img src="assets/step-upcoming.svg" alt="">
+        <span class="line"></span><img src="assets/step-upcoming.svg" alt="">
+        <span class="line"></span><img src="assets/step-upcoming.svg" alt="">
+      </div>
+      <div class="form">
+        <div class="tabs">
+          <button class="tab active" data-tab="topic">Тема</button>
+          <button class="tab" data-tab="text">Текст</button>
+          <button class="tab" data-tab="link">Ссылка</button>
+          <button class="tab" data-tab="file">Файл</button>
+        </div>
+        <div class="source" id="source"></div>
+        <button class="btn-primary" data-go="template">Продолжить</button>
+        <div class="examples" id="examples">
+          <p class="caption">Примеры запросов</p>
+          <div class="example-list">
+            <button class="example">Топ 10 стратегий миллиардеров</button>
+            <button class="example">Как обучить новое поколение лидеров</button>
+            <button class="example">Как успевать больше, работая меньше</button>
+            <button class="example">Мастерство переговоров: негласные правила</button>
+            <button class="example">Тренды образования</button>
+            <button class="example">Как сделать бизнес узнаваемым</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · Шаблон — до выбора -->
+    <section class="screen" data-screen="template" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <div class="catalog-frame"></div>
+      <button class="back" data-go="base">Назад</button>
+      <div class="progress" style="top:48px">
+        <img src="assets/step-tpl.svg" alt=""><span class="line"></span>
+        <span class="label">Шаблон презентации</span>
+        <span class="line"></span><img src="assets/step-tpl.svg" alt="">
+        <span class="line"></span><img src="assets/step-tpl.svg" alt="">
+      </div>
+      <div class="categories" id="categories"></div>
+      <div class="catalog"><div class="grid" id="grid"></div></div>
+      <div class="action-bar">
+        <button class="btn-primary" data-go="loading-structure">Пропустить</button>
+      </div>
+    </section>
+
+    <!-- 2.1 · Загрузка структуры -->
+    <section class="screen loading" data-screen="loading-structure" data-w="1440" data-h="859">
+      <img src="assets/loader-star.svg" alt="">
+      <p>Отправляем запрос на сервер</p>
+    </section>
+
+    <!-- 3 · Структура -->
+    <section class="screen" data-screen="structure" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <button class="back" data-go="template">Назад</button>
+      <div class="progress">
+        <img src="assets/step-done.svg" alt=""><span class="line"></span>
+        <img src="assets/step-done.svg" alt=""><span class="line"></span>
+        <span class="label">Структура презентации</span>
+        <span class="line"></span><img src="assets/step-upcoming-3.svg" alt="">
+      </div>
+      <button class="btn-primary top-continue" data-go="style">Продолжить</button>
+      <div class="structure">
+        <div id="items" style="display:flex;flex-direction:column;gap:9px"></div>
+        <button class="add" id="add-item"><img src="assets/plus.svg" alt="Добавить слайд"></button>
+        <button class="btn-primary" data-go="style">Продолжить</button>
+      </div>
+    </section>
+
+    <!-- 4 · Стиль презентации -->
+    <section class="screen" data-screen="style" data-w="1600" data-h="1036">
+      <div class="shot">
+        <img src="assets/style-screen.png" alt="" style="left:0;top:0;width:1600px;height:951.11px">
+        <div style="position:absolute;left:601px;top:38px;width:396px;height:57px;background:#000"></div>
+        <img src="assets/style-logo.png" alt="" style="left:695px;top:38px;width:187px;height:47px">
+        <div style="position:absolute;left:0;top:920px;width:1600px;height:116px;background:#000"></div>
+        <button class="btn-primary" data-go="loading-final"
+          style="position:absolute;left:469px;top:936px;width:661px;height:54px;font-size:20.5px;line-height:31.6px;padding:10px 20px">Сгенерировать презентацию</button>
+      </div>
+      <button class="hotspot" data-go="structure" title="Назад" style="left:18px;top:26px;width:96px;height:46px"></button>
+      <button class="hotspot" data-go="loading-final" title="Сгенерировать презентацию" style="left:1283px;top:26px;width:302px;height:48px"></button>
+    </section>
+
+    <!-- 5 · Генерация презентации -->
+    <section class="screen" data-screen="loading-final" data-w="1600" data-h="936">
+      <img class="final-img" src="assets/final-loading.png" alt="Отправляем запрос на сервер">
+    </section>
+  </div>
+</div>
+<div class="hint">Прототип <button id="restart">начать заново</button></div>
+
+<script>
+  // Фоновые звёзды — одинаковые на всех экранах макета: [left, top, size, inset%, file]
+  const STARS = [
+    [848, 146, 10, 124.8, 0], [1173, 213, 10, 134, 1], [1166.5, 209.5, 7, 212.86, 2],
+    [1272, 305, 28, 48.57, 3], [1362.5, 736.5, 27, 103.33, 4], [839.5, 541.5, 5, 318, 5],
+    [400.5, 765.5, 5, 299.6, 6], [553.5, 677.5, 13, 119.85, 7], [138, 530, 28, 48.57, 3],
+    [107, 399, 6, 226, 8], [382.5, 321.5, 3, 379.33, 9], [280, 271, 18, 67.56, 10], [51, 210, 2, 548, 11],
+  ];
+  document.querySelectorAll('.stars').forEach(layer => {
+    layer.innerHTML = STARS.map(([l, t, s, inset, f]) => {
+      const pad = s * inset / 100;
+      return `<div class="star" style="left:${l}px;top:${t}px;width:${s}px;height:${s}px">
+        <img src="assets/star${f}.svg" alt="" style="left:${-pad}px;top:${-pad}px;width:${s + 2 * pad}px;height:${s + 2 * pad}px"></div>`;
+    }).join('');
+  });
+
+  // Навигация и масштаб
+  const stage = document.getElementById('stage');
+  let current = null, timer = null;
+  function fit() {
+    const w = +current.dataset.w, h = +current.dataset.h;
+    stage.style.width = w + 'px';
+    stage.style.height = h + 'px';
+    const k = Math.min(innerWidth / w, innerHeight / h);
+    stage.style.transform = `translate(-50%, -50%) scale(${k})`;
+  }
+  function go(name) {
+    clearTimeout(timer);
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
+    current = document.querySelector(`[data-screen="${name}"]`);
+    fit();
+    if (name === 'loading-structure') timer = setTimeout(() => go('structure'), 2200);
+    if (name === 'template') document.querySelector('.catalog').scrollTop = 0;
+    try { location.hash = name; } catch (e) {}
+  }
+  addEventListener('resize', fit);
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-go]');
+    if (t) go(t.dataset.go);
+  });
+  document.getElementById('restart').onclick = () => go('base');
+
+  // 1 · вкладки источника
+  const SETTINGS = {
+    topic: ['10 слайдов|113', 'Язык: Авто|135', 'Нейтральный стиль|173'],
+    text: ['10 слайдов|113', 'Язык: Авто|135', 'Сохранить текст|150'],
+    link: ['10 слайдов|113', 'Язык: Авто|135', 'Переписать текст|150', 'Нейтральный стиль|173'],
+    file: ['10 слайдов|113', 'Язык: Авто|135', 'Сохранить текст|150'],
+  };
+  const values = { topic: '', text: '', link: '' };
+  const source = document.getElementById('source');
+  const examples = document.getElementById('examples');
+  let tab = 'topic';
+  function renderSource() {
+    let entry;
+    if (tab === 'topic') entry = `<div class="entry"><input id="field" placeholder="Тема презентации"></div>`;
+    if (tab === 'text') entry = `<textarea id="field" placeholder="Любой текст, на основе которого нужно создать презентацию"></textarea>`;
+    if (tab === 'link') entry = `<div class="entry"><img src="assets/link.svg" alt=""><input id="field" placeholder="https://example.com"></div>`;
+    if (tab === 'file') entry = `<label class="upload"><div class="formats">${
+      [['DOC', '#2457e8'], ['PDF', '#e8402f'], ['PPT', '#f06a2b'], ['TXT', '#21b04b']].map(([n, c]) =>
+        `<div class="file"><img src="assets/file-outline.svg" alt=""><span class="badge" style="background:${c}">${n}</span></div>`).join('')
+    }</div><span class="upload-link" id="upload-name">Загрузить с компьютера</span>
+      <input type="file" hidden accept=".doc,.docx,.pdf,.ppt,.pptx,.txt"></label>`;
+    const settings = SETTINGS[tab].map(s => {
+      const [label, w] = s.split('|');
+      return `<button class="setting" style="width:${w}px"><span>${label}</span><img src="assets/expand.svg" alt=""></button>`;
+    }).join('');
+    source.innerHTML = entry + `<div class="settings">${settings}</div>`;
+    const field = document.getElementById('field');
+    if (field) { field.value = values[tab]; field.oninput = () => values[tab] = field.value; }
+    const file = source.querySelector('input[type=file]');
+    if (file) file.onchange = () => { if (file.files[0]) document.getElementById('upload-name').textContent = file.files[0].name; };
+    examples.style.display = tab === 'topic' ? '' : 'none';
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  }
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderSource(); });
+  document.querySelectorAll('.example').forEach(b => b.onclick = () => {
+    values.topic = b.textContent;
+    document.getElementById('field').value = b.textContent;
+  });
+  renderSource();
+
+  // 2 · каталог шаблонов
+  const CATS = [['Все', ''], ['Образование', 7], ['Оформление', 8], ['Показ', 9], ['Анализ', 3], ['Результаты', 3],
+    ['Деловой', 4], ['Стратегия', 3], ['Структура', 5], ['Креатив', 6], ['Визуализация', 5], ['Достижения', 3],
+    ['Технологии', 5], ['Искусство', 4], ['IT', 2], ['Коммуникация', 5], ['Преимущества', 4], ['Простота', 5], ['Идеи', 5]];
+  const catsEl = document.getElementById('categories');
+  catsEl.innerHTML = CATS.map(([n, c], i) =>
+    `<button class="cat${i === 0 ? ' active' : ''}"><span>${n}</span><span class="count">${c}</span></button>`).join('');
+  catsEl.onclick = e => {
+    const b = e.target.closest('.cat');
+    if (!b) return;
+    catsEl.querySelectorAll('.cat').forEach(x => x.classList.toggle('active', x === b));
+  };
+
+  const TITLES = ['Презентация про войну', 'Презентация для урока по литературе', 'Презентация о социальных проблемах',
+    'Фотоальбом: создание и презентация', 'Презентация объекта промышленного дизайна', 'Презентация для юбилея',
+    'Презентация о космосе', 'Шаблон для викторины', 'Презентация о путешествии', 'Презентация в официальном стиле',
+    'Презентация про ИИ', 'Презентация кулинарного рецепта', 'Презентация с инфографикой', 'Презентация офиса',
+    'Презентация о технологии', 'Презентация для урока по географии', 'Шаблон презентации о путешествии',
+    'Презентация про электротранспорт', 'Презентация в пастельных тонах', 'Шаблон корпоративной презентации'];
+  const grid = document.getElementById('grid');
+  grid.innerHTML = TITLES.map((title, i) => {
+    const thumbs = i >= 8 ? `<div class="thumbs">${[0, 1, 2].map(k =>
+      `<img src="assets/covers/t${(i - 8) * 3 + k}.png" alt=""${k === 0 ? ' class="active"' : ''}>`).join('')}</div>` : '';
+    return `<div class="card" data-i="${i}" title="${title}"><img class="cover" src="assets/covers/c${i}.png" alt="">${thumbs}<p class="title">${title}</p></div>`;
+  }).join('');
+  grid.querySelectorAll('.card').forEach(card => {
+    const cover = card.querySelector('.cover');
+    const base = cover.src;
+    // Ховер по миниатюре показывает её в обложке
+    card.querySelectorAll('.thumbs img').forEach(t => {
+      t.onmouseenter = () => { cover.src = t.src; card.querySelectorAll('.thumbs img').forEach(x => x.classList.toggle('active', x === t)); };
+    });
+    card.querySelector('.thumbs')?.addEventListener('mouseleave', () => {
+      cover.src = base;
+      card.querySelectorAll('.thumbs img').forEach((x, k) => x.classList.toggle('active', k === 0));
+    });
+    // Клик по шаблону — сразу переход дальше
+    card.onclick = () => go('loading-structure');
+  });
+
+  // 3 · структура
+  let slides = ['1. Загадочный сосед Земли: Что мы знаем о Марсе?', '2. История изучения Красной планеты: От мифов до миссий.',
+    '3. Особенности марсианского ландшафта и климата.', '4. Следы воды на Марсе: Прошлое и настоящее.',
+    '5. Возможность жизни на Марсе: Научные гипотезы и открытия.', '6. Технологии исследования Марса: Ровер Curiosity и другие миссии.',
+    '7. Элон Маск и колонизация Марса: Реальность или фантазия?', '8. Выживание человека на Марсе: Проблемы и перспективы.',
+    '9. Космический туризм: Ближайшие планы путешествий на Марс.', '10. Будущее человечества за пределами Земли: Зачем нам Марс?'];
+  const itemsEl = document.getElementById('items');
+  let dragFrom = null;
+  function renderItems() {
+    itemsEl.innerHTML = slides.map((s, i) => `<div class="item" data-i="${i}">
+      <img class="drag" src="assets/drag.svg" alt="" draggable="false">
+      <input value="${s.replace(/"/g, '&quot;')}">
+      <button class="remove" aria-label="Удалить"><img src="assets/remove.svg" alt=""></button></div>`).join('');
+    itemsEl.querySelectorAll('.item').forEach(item => {
+      const i = +item.dataset.i;
+      item.querySelector('input').oninput = e => slides[i] = e.target.value;
+      item.querySelector('.remove').onclick = () => { slides.splice(i, 1); renderItems(); };
+      const handle = item.querySelector('.drag');
+      handle.onmousedown = () => item.draggable = true;
+      item.ondragstart = () => { dragFrom = i; item.classList.add('dragging'); };
+      item.ondragend = () => { item.draggable = false; item.classList.remove('dragging'); };
+      item.ondragover = e => e.preventDefault();
+      item.ondrop = e => {
+        e.preventDefault();
+        if (dragFrom === null || dragFrom === i) return;
+        const [m] = slides.splice(dragFrom, 1);
+        slides.splice(i, 0, m);
+        dragFrom = null;
+        renderItems();
+      };
+    });
+  }
+  document.getElementById('add-item').onclick = () => {
+    if (slides.length >= 12) return;
+    slides.push(`${slides.length + 1}. Новый слайд`);
+    renderItems();
+    const inputs = itemsEl.querySelectorAll('input');
+    inputs[inputs.length - 1].select();
+  };
+  renderItems();
+
+  function fromHash() {
+    const name = (location.hash || '').slice(1);
+    const target = document.querySelector(`[data-screen="${name}"]`) ? name : 'base';
+    if (!current || current.dataset.screen !== target) go(target);
+  }
+  addEventListener('hashchange', fromHash);
+  fromHash();
+</script>
+</body>
+</html>

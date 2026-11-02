@@ -1,0 +1,15 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="23.92" height="23.92" viewBox="0 0 23.92 23.92" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Star">
+<path id="Sparkle" d="M11.96 10.96C12.0433 11.71 12.21 11.8767 12.96 11.96C12.21 12.0433 12.0433 12.21 11.96 12.96C11.8767 12.21 11.71 12.0433 10.96 11.96C11.71 11.8767 11.8767 11.71 11.96 10.96Z" fill="white"/>
+<g id="Glow" opacity="0.36" filter="url(#filter0_f_0_30)">
+<circle cx="11.96" cy="11.96" r="6.5" fill="#6500FF"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_0_30" x="0" y="0" width="23.92" height="23.92" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="2.73" result="effect1_foregroundBlur_0_30"/>
+</filter>
+</defs>
+</svg>
