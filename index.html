@@ -188,7 +188,7 @@
       <div class="categories" id="categories"></div>
       <div class="catalog"><div class="grid" id="grid"></div></div>
       <div class="action-bar">
-        <button class="btn-primary" data-go="loading-structure">Пропустить</button>
+        <button class="btn-primary" data-go="loading-structure" data-template="none">Пропустить</button>
       </div>
     </section>
 
@@ -208,11 +208,11 @@
         <span class="label">Структура презентации</span>
         <span class="line"></span><img src="assets/step-upcoming-3.svg" alt="">
       </div>
-      <button class="btn-primary top-continue" data-go="style">Продолжить</button>
+      <button class="btn-primary top-continue" data-go="after-structure">Продолжить</button>
       <div class="structure">
         <div id="items" style="display:flex;flex-direction:column;gap:9px"></div>
         <button class="add" id="add-item"><img src="assets/plus.svg" alt="Добавить слайд"></button>
-        <button class="btn-primary" data-go="style">Продолжить</button>
+        <button class="btn-primary" data-go="after-structure">Продолжить</button>
       </div>
     </section>
 
@@ -257,6 +257,8 @@
   // Навигация и масштаб
   const stage = document.getElementById('stage');
   let current = null, timer = null;
+  // Если шаблон выбран, стиль уже задан им — экран «Стиль презентации» пропускаем
+  let templateChosen = false;
   function fit() {
     const w = +current.dataset.w, h = +current.dataset.h;
     stage.style.width = w + 'px';
@@ -265,6 +267,7 @@
     stage.style.transform = `translate(-50%, -50%) scale(${k})`;
   }
   function go(name) {
+    if (name === 'after-structure') name = templateChosen ? 'loading-final' : 'style';
     clearTimeout(timer);
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
     current = document.querySelector(`[data-screen="${name}"]`);
@@ -276,7 +279,9 @@
   addEventListener('resize', fit);
   document.addEventListener('click', e => {
     const t = e.target.closest('[data-go]');
-    if (t) go(t.dataset.go);
+    if (!t) return;
+    if (t.dataset.template === 'none') templateChosen = false;
+    go(t.dataset.go);
   });
   document.getElementById('restart').onclick = () => go('base');
 
@@ -368,7 +373,7 @@
       card.onmouseleave = () => show(0);
     }
     // Клик по шаблону — сразу переход дальше
-    card.onclick = () => go('loading-structure');
+    card.onclick = () => { templateChosen = true; go('loading-structure'); };
   });
 
   // 3 · структура
