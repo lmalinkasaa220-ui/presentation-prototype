@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Генерация из шаблона — прототип 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @font-face { font-family: 'Hauss'; font-weight: 300; src: local('ALS Hauss Book'), local('ALSHauss-Book'); }
+  @font-face { font-family: 'Hauss'; font-weight: 400; src: local('ALS Hauss'), local('ALSHauss-Regular'); }
+  @font-face { font-family: 'Hauss'; font-weight: 500 600; src: local('ALS Hauss Medium'), local('ALSHauss-Medium'); }
+  @font-face { font-family: 'Hauss'; font-weight: 700 900; src: local('ALS Hauss Bold'), local('ALSHauss-Bold'); }
+  :root {
+    --white: #fff;
+    --accent: #5000e7;
+    --accent-border: #6900ff;
+    --accent-soft: #ece6ff;
+    --chip: #1d1d1f;
+    --chip-active: #343436;
+    --setting: #191919;
+    --muted: #999;
+    --connector: #686868;
+    --page: #f4f4f4;
+    --ink: #111;
+    --ink-muted: #a3a3a3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { font-family: 'Inter', sans-serif; color: var(--white); }
+  body.is-light { background: var(--page); }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; background: none; border: 0; outline: none; resize: none; }
+
+  /* Экраны рисуются в масштабе макета и вписываются в окно */
+  .viewport { position: fixed; inset: 0; }
+  .stage { position: absolute; left: 50%; top: 50%; transform-origin: center; background: #000; overflow: hidden; }
+  body.is-light .stage { left: 0; top: 0; transform-origin: 0 0; background: var(--page); }
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+
+  /* ───────── Светлые экраны сервиса ───────── */
+  .light, .overlay, .menu, .toast { font-family: 'Hauss', 'Inter', sans-serif; }
+  .light { color: var(--ink); background: var(--page); }
+  .sidebar { position: absolute; left: 0; top: 0; bottom: 0; width: 225px; background: #fff; padding: 22px 13px 20px; display: flex; flex-direction: column; }
+  .logo { font-size: 28px; font-weight: 900; letter-spacing: -1px; line-height: 1; padding-left: 8px; margin: 4px 0 20px; cursor: pointer; }
+  .side-label { font-size: 14px; letter-spacing: .6px; color: var(--ink-muted); padding: 0 8px 7px; display: flex; align-items: center; gap: 18px; }
+  .side-label b { color: var(--accent); font-weight: 200; font-size: 26px; line-height: 14px; }
+  .team { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; font-size: 15px; margin-bottom: 4px; }
+  .team.active { background: var(--accent-soft); }
+  .team .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .team .name { flex: 1; }
+  .pro { background: var(--accent); color: #fff; font-size: 11px; font-weight: 500; border-radius: 20px; padding: 2px 6px; }
+  .side-link { display: flex; align-items: center; gap: 9px; text-align: left; padding: 4px 8px; font-size: 15px; line-height: 17.5px; }
+  .side-link:hover, .side-link.active { color: var(--accent); }
+  .side-gap { height: 24px; }
+  .new { background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 600; border-radius: 20px; padding: 2px 7px; }
+  .side-foot { margin-top: auto; padding-left: 8px; font-size: 14px; color: #333; }
+
+  .main { position: absolute; left: 225px; right: 0; top: 0; bottom: 0; overflow-y: auto; padding: 22px 14px 80px 13px; scrollbar-width: thin; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; height: 40px; margin-bottom: 16px; }
+  .h1 { font-size: 27px; font-weight: 600; letter-spacing: -.3px; }
+  .top-tools { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+  .top-tools .sep { width: 1px; height: 14px; background: #ccc; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px 14px; }
+
+  /* Плитки «ИИ / Создать / Из файла» занимают одну колонку */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; aspect-ratio: 16 / 9; }
+  .tile { background: #fff; border-radius: 8px; padding: 14px 13px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; font-size: 16px; font-weight: 300; text-align: left; transition: background .15s, color .15s; }
+  .tile svg { width: 28px; height: 28px; color: var(--accent); }
+  .tile:hover { background: var(--accent); color: #fff; }
+  .tile:hover svg { color: #fff; }
+
+  .pcard { position: relative; }
+  .pcover { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #ddd; cursor: pointer; }
+  .pcover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .css-cover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700; line-height: 1.05; padding: 10px; }
+  .pinfo { display: flex; align-items: flex-start; justify-content: space-between; padding-top: 9px; }
+  .ptitle { font-size: 16px; font-weight: 300; }
+  .pmeta { font-size: 13px; color: var(--ink-muted); margin-top: 2px; }
+  .more { width: 28px; height: 22px; border-radius: 6px; color: #aaa; font-size: 18px; letter-spacing: 1px; line-height: 10px; }
+  .more:hover { background: #e7e7e7; color: #333; }
+
+  .menu { position: absolute; z-index: 20; background: #fff; color: var(--ink); border-radius: 12px; padding: 8px 0; width: 210px; box-shadow: 0 10px 40px rgba(0,0,0,.14); font-size: 15px; display: none; }
+  .menu.open { display: block; }
+  .menu button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 8px 20px; }
+  .menu button:hover { background: #f4f4f4; }
+  .menu hr { border: 0; border-top: 1px solid #e5e5e5; margin: 6px 20px; }
+  .menu .danger { color: #e8402f; }
+  .menu .accent { color: var(--accent); font-weight: 500; }
+
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; margin: 56px 0 14px; }
+  .section-title h2 { font-size: 27px; font-weight: 600; }
+  .link { color: var(--accent); font-size: 15px; }
+
+  /* Карточка шаблона: обложка + три миниатюры + подпись */
+  .tcard { cursor: pointer; }
+  .tcard .pcover { transition: box-shadow .15s; }
+  .tcard:hover .pcover { box-shadow: 0 0 0 2px var(--accent); }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 7px; overflow: hidden; background: #e2e2e2; cursor: pointer; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid rgba(0,0,0,.14); pointer-events: none; }
+  .thumb.sel::after { border: 2px solid var(--accent); }
+  .thumb:empty::after { display: none; }
+  .thumb:empty { visibility: hidden; }
+  .tcard .css-cover, .thumb .css-cover { font-size: 46px; }
+  .thumb .css-cover { font-size: 14px; }
+  /* Узкая плитка «Загрузить» слева от сетки, высотой с обложку */
+  .tgrid-wrap { display: flex; gap: 14px; align-items: flex-start; container-type: inline-size; }
+  .tgrid-wrap .grid4 { flex: 1; min-width: 0; }
+  .upload-narrow { display: none; flex: 0 0 105px; height: calc((100cqw - 161px) / 4 * 9 / 16); }
+  .tgrid-wrap.mine .upload-narrow { display: flex; }
+
+  .lead { font-size: 15px; line-height: 22px; max-width: 1200px; margin-bottom: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 10px; }
+  .chip { background: #fff; border-radius: 30px; padding: 9px 13px; font-size: 16px; font-weight: 300; display: flex; gap: 5px; }
+  .chip .n { color: #c3c3c3; }
+  .chip:hover { color: var(--accent); }
+  .chip.active { background: var(--accent); color: #fff; }
+  .chip.active .n { color: rgba(255,255,255,.6); }
+  .chip.team { border: 1.5px solid var(--accent); padding: 7.5px 12px; color: var(--accent); font-weight: 400; }
+  .chip.team.active { color: #fff; }
+  .search { background: #fff; border-radius: 30px; width: 500px; height: 40px; padding: 0 16px; display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 16px; margin-bottom: 30px; }
+  .search input { flex: 1; color: var(--ink); }
+  .empty-note { grid-column: span 4; align-self: center; color: #888; font-size: 15px; line-height: 22px; padding-left: 10px; }
+
+  /* Страница шаблона */
+  .crumbs { font-size: 14px; color: #888; margin: 4px 0 26px; }
+  .crumbs button { color: var(--ink); }
+  .crumbs button:hover { color: var(--accent); }
+  .tpage { display: grid; grid-template-columns: 1fr 470px; gap: 34px; }
+  .hero { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #ddd; }
+  .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero .css-cover { font-size: 120px; }
+  .strip { background: #ebebeb; border-radius: 12px; padding: 9px; margin-top: 12px; display: flex; gap: 10px; }
+  .strip .thumb { width: 175px; cursor: pointer; flex-shrink: 0; }
+  .tside h1 { font-size: 46px; font-weight: 400; letter-spacing: -.8px; line-height: 1.08; }
+  .tside .slides { font-size: 18px; color: #999; font-weight: 300; margin-top: 8px; }
+  .tside .desc { font-size: 17px; line-height: 25px; color: #8a8a8a; font-weight: 300; margin-top: 28px; }
+  .props { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; font-size: 17px; }
+  .props div { display: flex; align-items: center; gap: 12px; }
+  .props svg { width: 18px; height: 18px; color: #999; flex-shrink: 0; }
+  .actions { margin-top: 44px; display: flex; flex-direction: column; gap: 10px; }
+  .btn { height: 52px; border-radius: 40px; font-size: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; transition: background .15s; }
+  .btn-fill { background: var(--accent); color: #fff; }
+  .btn-fill:hover { background: #5f14ff; }
+  .btn-fill svg { width: 20px; height: 20px; }
+  .btn-line { border: 2px solid var(--accent); color: var(--accent); }
+  .btn-line:hover { background: var(--accent-soft); }
+  .btn-text { height: 36px; color: #777; font-size: 15px; }
+  .btn-text:hover { color: var(--accent); }
+  .note { font-size: 13px; line-height: 18px; color: #999; text-align: center; padding: 0 20px; }
+  .tpage-bottom { margin-top: 44px; }
+  .tpage-bottom h3 { font-size: 30px; font-weight: 600; margin: 0 0 16px; }
+  .tpage-bottom p { font-size: 16px; line-height: 24px; max-width: 1150px; margin-bottom: 40px; }
+
+  /* Модальное окно, разбор шаблона, уведомление */
+  .overlay { position: absolute; inset: 0; z-index: 50; background: rgba(20,20,25,.4); display: none; align-items: center; justify-content: center; color: var(--ink); }
+  .overlay.open { display: flex; animation: fade .2s ease; }
+  .modal { width: 560px; background: #fff; border-radius: 20px; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal h2 { font-size: 26px; font-weight: 400; letter-spacing: -.3px; }
+  .modal .sub { font-size: 15px; line-height: 21px; color: #777; margin-top: 8px; }
+  .modal.add-box { position: relative; width: 980px; padding: 28px; display: grid; grid-template-columns: 1fr 300px; gap: 32px; }
+  .add-hero { border-radius: 10px; }
+  .add-hero .css-cover { font-size: 80px; }
+  .add-strip { display: flex; gap: 8px; margin-top: 10px; }
+  .add-strip .thumb { width: 112px; cursor: pointer; }
+  .add-strip .thumb .css-cover { font-size: 12px; }
+  .add-side { display: flex; flex-direction: column; padding-top: 6px; }
+  .add-side h2 { font-size: 34px; font-weight: 400; letter-spacing: -.6px; line-height: 1.1; padding-right: 30px; }
+  .add-slides { font-size: 17px; color: #999; font-weight: 300; margin-top: 8px; }
+  .add-field { display: block; margin-top: 34px; }
+  .add-field span { display: block; font-size: 14px; color: #999; font-weight: 300; margin-bottom: 8px; padding-left: 18px; }
+  .add-field input { width: 100%; height: 52px; border-radius: 40px; background: var(--page); padding: 0 18px; font-size: 18px; color: var(--ink); box-shadow: inset 0 0 0 2px transparent; transition: box-shadow .15s; }
+  .add-field input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+  .add-actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .close { position: absolute; right: 18px; top: 18px; width: 32px; height: 32px; border-radius: 50%; color: #999; display: flex; align-items: center; justify-content: center; }
+  .close:hover { background: var(--page); color: var(--ink); }
+  .close svg { width: 16px; height: 16px; }
+  .btn-ghost { color: #555; }
+  .btn-ghost:hover { background: #f1f1f1; }
+
+  @keyframes rot { to { transform: rotate(360deg) } }
+
+  .toast { position: absolute; left: 50%; bottom: 34px; transform: translate(-50%, 20px); background: #111; color: #fff; border-radius: 14px; padding: 14px 18px; font-size: 15px; display: flex; align-items: center; gap: 16px; z-index: 60; opacity: 0; pointer-events: none; transition: all .25s; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  .toast button { color: #b9a0ff; font-weight: 500; }
+
+  /* ───────── Темные экраны генерации (как в прототипе 1) ───────── */
+  .stars { position: absolute; inset: 0; pointer-events: none; }
+  .star { position: absolute; }
+  .star img { position: absolute; display: block; width: auto; height: auto; }
+
+  .back {
+    position: absolute; left: 15px; top: 26px; width: 75px; height: 37px;
+    background: #000; border: 1px solid #a6a6a6; border-radius: 8px;
+    font-size: 14px; line-height: 20px; z-index: 2;
+  }
+  .back:hover { border-color: #fff; }
+
+  .progress { position: absolute; left: 50%; transform: translateX(-50%); top: 45px; height: 15px; display: flex; gap: 9px; align-items: center; white-space: nowrap; z-index: 2; }
+  .progress .label { font-size: 13px; font-weight: 500; }
+  .progress .line { width: 45px; height: 1px; background: var(--connector); flex-shrink: 0; }
+  .progress img { width: 15px; height: 15px; display: block; flex-shrink: 0; }
+
+  .btn-primary {
+    background: var(--accent); border-radius: 100px; height: 43px; padding: 8px 16px;
+    font-size: 13px; font-weight: 700; line-height: 20px; color: #fff;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+  }
+  .btn-primary:hover { background: #5f14ff; }
+
+  .form { position: absolute; left: 375px; top: 93px; width: 690px; display: flex; flex-direction: column; z-index: 1; }
+  .tabs { background: var(--chip); border-radius: 100px; height: 38px; padding: 2px; display: flex; }
+  .tab { flex: 1; border-radius: 100px; font-size: 12px; line-height: 16px; }
+  .tab.active { background: var(--chip-active); }
+  .source {
+    margin-top: 18px; background: #000; border: 1px solid var(--accent-border); border-radius: 18px;
+    box-shadow: 0 0 24px rgba(101,0,255,.21); padding: 17px 18px 18px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .entry { display: flex; align-items: center; gap: 0; height: 25px; }
+  .entry input { flex: 1; font-size: 14px; height: 25px; }
+  .entry input::placeholder, .source textarea::placeholder { color: var(--muted); }
+  .entry img { width: 14px; height: 17px; margin-right: 1px; }
+  .source textarea { height: 260px; font-size: 14px; width: 100%; }
+  .upload { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0 4px; }
+  .formats { display: flex; gap: 9px; }
+  .file { position: relative; width: 30px; height: 36px; }
+  .file img { position: absolute; inset: 0; }
+  .badge { position: absolute; left: -3px; top: 19px; padding: 1px 2px; border-radius: 1.5px; font-size: 7px; font-weight: 700; line-height: normal; }
+  .upload-link { font-size: 12px; text-decoration: underline; }
+  .settings { display: flex; gap: 7px; }
+  .setting {
+    background: var(--setting); border-radius: 100px; height: 27px; padding: 0 12px 0 13px;
+    display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 500;
+  }
+  .setting img { width: 9px; height: 5px; overflow: visible; }
+  .form .btn-primary { margin-top: 12px; }
+  .examples { margin-top: 32px; display: flex; flex-direction: column; align-items: center; gap: 11px; }
+  .examples .caption { font-size: 11px; color: #757575; }
+  .example-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .example { border: 1px solid rgba(255,255,255,.3); border-radius: 9px; padding: 8px 12px; font-size: 12px; }
+  .example:hover { border-color: rgba(255,255,255,.7); }
+
+  .catalog-frame { position: absolute; left: 165px; top: 107px; width: 1110px; height: 695px; border: 1px solid var(--accent); border-radius: 18px; }
+  .categories { position: absolute; left: 230px; top: 141px; width: 982px; display: flex; flex-wrap: wrap; gap: 9px 6px; z-index: 1; }
+  .cat { background: var(--chip); border-radius: 100px; padding: 8px 13px; font-size: 12px; display: flex; gap: 4px; white-space: nowrap; }
+  .cat .count { color: #757575; }
+  .cat.active { background: #fff; color: #000; }
+  .cat.active .count { display: none; }
+  .cat.team { box-shadow: inset 0 0 0 1px var(--accent-border); }
+  .cat.team.active { background: var(--accent); color: #fff; box-shadow: none; }
+  .catalog { position: absolute; left: 192px; top: 262px; width: 1056px; height: 534px; overflow-y: auto; overflow-x: hidden; z-index: 1; padding: 8px 8px 110px; scrollbar-width: none; }
+  .catalog::-webkit-scrollbar { display: none; }
+  .grid { display: flex; flex-wrap: wrap; gap: 23px 16px; width: 1040px; }
+  .card { position: relative; width: 248px; height: 139.5px; border-radius: 10px; overflow: hidden; cursor: pointer; background: #222; }
+  .card .css-cover { font-size: 36px; }
+  .cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .owner { position: absolute; left: 8px; top: 8px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 600; border-radius: 20px; padding: 2px 7px; }
+  .pages { position: absolute; left: 8px; right: 8px; bottom: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; pointer-events: none; }
+  .card:hover .pages, .pcover:hover .pages { opacity: 1; }
+  .pages span { flex: 1; height: 2px; border-radius: 2px; background: rgba(255,255,255,.4); box-shadow: 0 0 2px rgba(0,0,0,.4); }
+  .pages span.active { background: #fff; }
+  .action-bar { position: absolute; left: 0; top: 765px; width: 1440px; height: 94px; background: #0e0e0f; border-top: 1px solid #303033; z-index: 3; }
+  .action-bar .btn-primary { position: absolute; left: 375px; top: 25px; width: 690px; }
+
+  .loading { display: none; align-items: center; justify-content: center; gap: 29px; }
+  .loading.active { display: flex; }
+  .loading img { width: 245px; height: 245px; animation: spin 2.4s cubic-bezier(.6,0,.4,1) infinite; }
+  .loading p { font-size: 14px; }
+  @keyframes spin { 0% { transform: rotate(0) scale(1) } 50% { transform: rotate(45deg) scale(.9) } 100% { transform: rotate(90deg) scale(1) } }
+
+  .structure { position: absolute; left: 430px; top: 93px; width: 580px; display: flex; flex-direction: column; gap: 9px; z-index: 1; }
+  .item { background: var(--chip); border-radius: 100px; height: 41px; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
+  .item.dragging { opacity: .4; }
+  .item .drag { width: 13px; height: 13px; cursor: grab; }
+  .item input { flex: 1; font-size: 12px; font-weight: 500; min-width: 0; text-overflow: ellipsis; }
+  .item .remove { width: 11px; height: 11px; display: flex; opacity: .8; }
+  .item .remove:hover { opacity: 1; }
+  .add { background: var(--chip); border-radius: 100px; height: 41px; display: flex; align-items: center; justify-content: center; }
+  .add:hover { background: #262628; }
+  .add img { width: 19px; height: 19px; }
+  .structure .btn-primary { margin-top: 23px; }
+  .top-continue { position: absolute; left: 1308px; top: 23px; z-index: 2; }
+
+  .shot { position: absolute; inset: 0; background: #000; }
+  .shot img { position: absolute; display: block; }
+  .hotspot { position: absolute; z-index: 2; }
+  .final-img { width: 100%; height: 100%; object-fit: contain; }
+
+  .hint { position: fixed; right: 12px; bottom: 10px; font-size: 11px; color: #777; z-index: 100; }
+  .hint button { color: #888; text-decoration: underline; margin-left: 6px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-spark" viewBox="0 0 28 28"><path fill="currentColor" d="M11 4c.9 5.6 3.4 8.1 9 9-5.6.9-8.1 3.4-9 9-.9-5.6-3.4-8.1-9-9 5.6-.9 8.1-3.4 9-9zM22 1c.4 2.4 1.5 3.5 4 4-2.5.5-3.6 1.6-4 4-.4-2.4-1.5-3.5-4-4 2.5-.5 3.6-1.6 4-4z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 28 28"><path stroke="currentColor" stroke-width="1.6" d="M14 2v24M2 14h24"/></symbol>
+  <symbol id="i-down" viewBox="0 0 28 28"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M14 2v17m-7-7 7 7 7-7M3 18v7h22v-7"/></symbol>
+  <symbol id="i-up" viewBox="0 0 28 28"><path fill="none" stroke="currentColor" stroke-width="1.6" d="M14 21V4m-7 7 7-7 7 7M3 18v7h22v-7"/></symbol>
+  <symbol id="i-star-o" viewBox="0 0 20 20"><path fill="none" stroke="currentColor" stroke-width="1.3" d="M10 2c.6 4 2 5.4 6 6-4 .6-5.4 2-6 6-.6-4-2-5.4-6-6 4-.6 5.4-2 6-6z"/></symbol>
+  <symbol id="i-font" viewBox="0 0 20 20"><text x="0" y="15" font-size="13" fill="currentColor" font-family="Inter">A</text><text x="10" y="15" font-size="9" fill="currentColor" font-family="Inter">a</text></symbol>
+  <symbol id="i-unused" viewBox="0 0 20 20"><circle cx="7" cy="7" r="3" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="14" cy="8" r="2.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path fill="none" stroke="currentColor" stroke-width="1.3" d="M1.5 17c.5-3 2.6-4.5 5.5-4.5s5 1.5 5.5 4.5M13 12.5c2.5 0 4.6 1.2 5 4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="11" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path stroke="currentColor" stroke-width="1.5" d="M7 12l-5 5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/></symbol>
+</svg>
+
+<div class="viewport">
+  <div class="stage" id="stage">
+
+    <!-- А · Мои презентации -->
+    <section class="screen light" data-screen="home" data-w="1600" data-h="1000">
+      <aside class="sidebar" data-side="home"></aside>
+      <div class="main">
+        <div class="topbar">
+          <h1 class="h1">Мои презентации</h1>
+          <div class="top-tools">
+            <span style="display:flex;gap:6px;align-items:center"><svg width="18" height="18"><use href="#i-gear"/></svg>Настройки</span>
+            <span class="sep"></span>
+            <span>Сортировать: по дате изменения ▴</span>
+            <svg width="20" height="20"><use href="#i-search"/></svg>
+          </div>
+        </div>
+        <div class="grid4" id="presentations"></div>
+        <div class="section-title"><h2>Готовые шаблоны</h2><button class="link" data-go="templates">Все шаблоны →</button></div>
+        <div class="grid4" id="home-templates"></div>
+      </div>
+    </section>
+
+    <!-- Б · Шаблоны -->
+    <section class="screen light" data-screen="templates" data-w="1600" data-h="1000">
+      <aside class="sidebar" data-side="templates"></aside>
+      <div class="main" id="templates-main">
+        <h1 class="h1" style="font-size:46px;font-weight:700;letter-spacing:-1px;margin:14px 0 22px">Готовые шаблоны для презентаций</h1>
+        <p class="lead">В библиотеке «Фокуса» — сотни шаблонов для любых задач: учебных, деловых, творческих. Каждый оформлен с чувством вкуса и логики: продуманные фоны, цвета и композиции создают гармоничный визуальный стиль.</p>
+        <div class="chips" id="chips"></div>
+        <label class="search"><svg width="18" height="18"><use href="#i-search"/></svg><input placeholder="Поиск"></label>
+        <div class="tgrid-wrap">
+          <button class="tile upload-narrow" id="upload-tpl"><svg><use href="#i-down"/></svg>Загрузить</button>
+          <div class="grid4" id="tgrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- В · Страница шаблона -->
+    <section class="screen light" data-screen="template-page" data-w="1600" data-h="1000">
+      <aside class="sidebar" data-side="templates"></aside>
+      <div class="main" id="tpage"></div>
+    </section>
+
+    <!-- 1 · Основа презентации -->
+    <section class="screen" data-screen="base" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <button class="back" data-go="back-from-base">Назад</button>
+      <div class="progress" data-progress="0"></div>
+      <div class="form">
+        <div class="tabs">
+          <button class="tab active" data-tab="topic">Тема</button>
+          <button class="tab" data-tab="text">Текст</button>
+          <button class="tab" data-tab="link">Ссылка</button>
+          <button class="tab" data-tab="file">Файл</button>
+        </div>
+        <div class="source" id="source"></div>
+        <button class="btn-primary" data-go="after-base">Продолжить</button>
+        <div class="examples" id="examples">
+          <p class="caption">Примеры запросов</p>
+          <div class="example-list">
+            <button class="example">Топ 10 стратегий миллиардеров</button>
+            <button class="example">Как обучить новое поколение лидеров</button>
+            <button class="example">Как успевать больше, работая меньше</button>
+            <button class="example">Мастерство переговоров: негласные правила</button>
+            <button class="example">Тренды образования</button>
+            <button class="example">Как сделать бизнес узнаваемым</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 · Шаблон (только в пути через ИИ) -->
+    <section class="screen" data-screen="template" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <div class="catalog-frame"></div>
+      <button class="back" data-go="base">Назад</button>
+      <div class="progress" data-progress="1" style="top:48px"></div>
+      <div class="categories" id="categories"></div>
+      <div class="catalog"><div class="grid" id="grid"></div></div>
+      <div class="action-bar">
+        <button class="btn-primary" data-go="loading-structure" data-template="none">Пропустить</button>
+      </div>
+    </section>
+
+    <!-- Подготовка шаблона после «Добавить в шаблоны» — тот же экран, что генерация -->
+    <section class="screen loading" data-screen="parse" data-w="1440" data-h="859">
+      <img src="assets/loader-star.svg" alt="">
+      <p id="parse-text"></p>
+    </section>
+
+    <!-- 2.1 · Загрузка структуры -->
+    <section class="screen loading" data-screen="loading-structure" data-w="1440" data-h="859">
+      <img src="assets/loader-star.svg" alt="">
+      <p>Отправляем запрос на сервер</p>
+    </section>
+
+    <!-- 3 · Структура -->
+    <section class="screen" data-screen="structure" data-w="1440" data-h="859">
+      <div class="stars"></div>
+      <button class="back" data-go="back-from-structure">Назад</button>
+      <div class="progress" data-progress="structure"></div>
+      <button class="btn-primary top-continue" data-go="after-structure">Продолжить</button>
+      <div class="structure">
+        <div id="items" style="display:flex;flex-direction:column;gap:9px"></div>
+        <button class="add" id="add-item"><img src="assets/plus.svg" alt="Добавить слайд"></button>
+        <button class="btn-primary" data-go="after-structure">Продолжить</button>
+      </div>
+    </section>
+
+    <!-- 4 · Стиль презентации (только если шаблон пропущен) -->
+    <section class="screen" data-screen="style" data-w="1600" data-h="1036">
+      <div class="shot">
+        <img src="assets/style-screen.png" alt="" style="left:0;top:0;width:1600px;height:951.11px">
+        <div style="position:absolute;left:601px;top:38px;width:396px;height:57px;background:#000"></div>
+        <img src="assets/style-logo.png" alt="" style="left:695px;top:38px;width:187px;height:47px">
+        <div style="position:absolute;left:0;top:920px;width:1600px;height:116px;background:#000"></div>
+        <button class="btn-primary" data-go="loading-final"
+          style="position:absolute;left:469px;top:936px;width:661px;height:54px;font-size:20.5px;line-height:31.6px;padding:10px 20px">Сгенерировать презентацию</button>
+      </div>
+      <button class="hotspot" data-go="structure" title="Назад" style="left:18px;top:26px;width:96px;height:46px"></button>
+      <button class="hotspot" data-go="loading-final" title="Сгенерировать презентацию" style="left:1283px;top:26px;width:302px;height:48px"></button>
+    </section>
+
+    <!-- 5 · Генерация презентации -->
+    <section class="screen" data-screen="loading-final" data-w="1600" data-h="936">
+      <img class="final-img" src="assets/final-loading.png" alt="Отправляем запрос на сервер">
+    </section>
+
+    <!-- Окно «Добавить в шаблоны» — повторяет страницу шаблона: превью слева, название и кнопка справа -->
+    <div class="overlay" id="add-modal">
+      <div class="modal add-box">
+        <button class="close" id="add-close" aria-label="Закрыть"><svg viewBox="0 0 20 20"><path d="M4 4l12 12M16 4L4 16" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <div>
+          <div class="hero add-hero" id="add-preview"></div>
+          <div class="add-strip" id="add-strip"></div>
+        </div>
+        <div class="add-side">
+          <h2>Добавить в шаблоны</h2>
+          <div class="add-slides" id="add-slides"></div>
+          <label class="add-field">
+            <span>Название</span>
+            <input id="add-name" spellcheck="false">
+          </label>
+          <div class="add-actions">
+            <button class="btn btn-fill" id="add-ok">Добавить в шаблоны</button>
+            <button class="btn btn-text" id="add-cancel">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <div class="menu" id="menu">
+      <button>Открыть</button>
+      <button>Переименовать</button>
+      <button>Поделиться</button>
+      <hr>
+      <button>Дублировать</button>
+      <button id="menu-add">Добавить в шаблоны</button>
+      <hr>
+      <button class="danger">Удалить</button>
+    </div>
+  </div>
+</div>
+<div class="hint">Прототип 2 · <a href="./" style="color:#888">прототип 1</a> <button id="restart">начать заново</button></div>
+<input type="file" id="file-input" hidden accept=".ppt,.pptx,.pdf,.key">
+
+<script>
+  const A = 'assets/';
+
+  // ───────── Данные ─────────
+  // Шаблоны библиотеки: [название, обложка, первая из трех миниатюр или null, слайдов, автор, шрифт, теги]
+  const LIB = [
+    ['Презентация про войну', 0, null, 15, 'Арина Винникова', 'Oswald', ['Образование', 'Знания', 'Сторителлинг', 'Лекция']],
+    ['Презентация для урока по литературе', 1, null, 10, 'Мария Котова', 'Lora', ['Образование', 'Литература']],
+    ['Презентация о социальных проблемах', 2, null, 13, 'Илья Рогов', 'Anton', ['Анализ', 'Общество']],
+    ['Фотоальбом: создание и презентация', 3, null, 10, 'Анна Белова', 'Montserrat', ['Креатив', 'Фото']],
+    ['Презентация объекта промышленного дизайна', 4, null, 12, 'Олег Ким', 'Times New Roman', ['Искусство', 'Дизайн']],
+    ['Презентация для юбилея', 5, null, 9, 'Вера Лис', 'Rubik', ['Праздник', 'Креатив']],
+    ['Презентация о космосе', 6, null, 11, 'Дмитрий Орлов', 'Inter', ['Образование', 'Наука']],
+    ['Шаблон для викторины', 7, null, 14, 'Анна Белова', 'Press Start', ['Игра', 'Креатив']],
+    ['Презентация в официальном стиле', 9, 3, 12, 'Илья Рогов', 'Inter', ['Деловой', 'Структура']],
+    ['Презентация про ИИ', 10, 6, 10, 'Олег Ким', 'Unbounded', ['Технологии', 'IT']],
+    ['Презентация кулинарного рецепта', 11, 9, 8, 'Вера Лис', 'Playfair', ['Креатив', 'Простота']],
+    ['Презентация с инфографикой', 12, 12, 12, 'Мария Котова', 'Inter', ['Визуализация', 'Анализ']],
+    ['Презентация офиса', 13, 15, 10, 'Дмитрий Орлов', 'Manrope', ['Деловой']],
+    ['Презентация о технологии', 14, 18, 11, 'Олег Ким', 'Inter', ['Технологии']],
+    ['Презентация для урока по географии', 15, 21, 12, 'Мария Котова', 'Golos', ['Образование']],
+    ['Шаблон презентации о путешествии', 16, 24, 10, 'Анна Белова', 'Montserrat', ['Идеи', 'Креатив']],
+    ['Презентация про электротранспорт', 17, 27, 9, 'Илья Рогов', 'Inter', ['Технологии', 'Преимущества']],
+    ['Презентация в пастельных тонах', 18, 30, 10, 'Вера Лис', 'Lora', ['Оформление', 'Простота']],
+  ].map(([title, c, t, slides, author, font, tags], i) => ({
+    id: 'lib' + i, title, slides, author, font, tags,
+    pages: [`${A}covers/c${c}.png`].concat(t === null ? [] : [`${A}covers/t${t + 1}.png`, `${A}covers/t${t + 2}.png`]),
+    desc: `Шаблон «${title.toLowerCase()}» с продуманными сочетаниями цвета, шрифтов и мест для изображений.`,
+  }));
+
+  // Файл, который компания загружает как свой шаблон
+  const COMPANY_FILE = { title: 'angik.pptx', pages: [`${A}covers/c19.png`, `${A}covers/t34.png`, `${A}covers/t35.png`], slides: 14 };
+
+  // Мои презентации (обложки-заглушки рисуются CSS)
+  let presentations = [
+    { id: 'p1', title: 'Марс', meta: 'изменено 1 д назад', slides: 10, css: { bg: '#7a1414', color: '#fff', text: 'Марс', size: 64 } },
+    { id: 'p2', title: 'Марс', meta: 'изменено 2 нед. назад', slides: 10, css: { bg: '#00e03a', color: '#fff', text: 'Марс', size: 64 } },
+    { id: 'p3', title: 'Без названия', meta: 'изменено 2 нед. назад', slides: 6, pages: [`${A}covers/c16.png`] },
+    { id: 'p4', title: 'Знакомство с «Фокусом»', meta: 'изменено 3 нед. назад', slides: 8, css: { bg: '#5a00ff', color: '#fff', text: 'Достаточно<br>начать печатать…', size: 24, weight: 400 } },
+    { id: 'p5', title: 'Стратегия на 2027', meta: 'изменено 1 мес. назад', slides: 12, pages: [`${A}covers/c12.png`] },
+    { id: 'p6', title: 'Рецепт вафель', meta: 'изменено 2 мес. назад', slides: 7, pages: [`${A}covers/c11.png`] },
+    { id: 'p7', title: 'Без названия', meta: 'изменено 2 мес. назад', slides: 5, pages: [`${A}covers/c14.png`] },
+  ];
+  let teamTemplates = [];   // мои шаблоны, добавленные в прототипе
+
+  // ───────── Состояние сценария ─────────
+  let preset = null;          // шаблон, выбранный до генерации (путь со страницы шаблона)
+  let templateChosen = false; // шаблон выбран на шаге «Шаблон» (путь через ИИ)
+  let pageTpl = LIB[0];       // открытая страница шаблона
+  let pageIdx = 0;
+  let tplFilter = 'all';
+  let baseOrigin = 'home';
+
+  const byId = id => LIB.concat(teamTemplates).find(t => t.id === id) || presentations.find(p => p.id === id);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+  function coverHTML(item, k = 0, dots = false) {
+    if (item.pages && item.pages.length) {
+      const d = dots && item.pages.length > 1 ? `<div class="pages">${item.pages.map((_, j) => `<span${j ? '' : ' class="active"'}></span>`).join('')}</div>` : '';
+      return `<img src="${item.pages[Math.min(k, item.pages.length - 1)]}" alt="">${d}`;
+    }
+    const c = item.css;
+    return `<div class="css-cover" style="background:${c.bg};color:${c.color};font-weight:${c.weight || 700}"><span style="font-size:${c.size}px">${c.text}</span></div>`;
+  }
+  // Листание обложки по ховеру, как в прототипе 1
+  function hoverPages(el, item, thumbs = []) {
+    if (!item.pages || item.pages.length < 2) return;
+    const img = el.querySelector('img'), dots = el.querySelectorAll('.pages span');
+    item.pages.slice(1).forEach(src => { new Image().src = src; });
+    const show = k => {
+      img.src = item.pages[k];
+      dots.forEach((d, j) => d.classList.toggle('active', j === k));
+      thumbs.forEach((t, j) => t.classList.toggle('sel', j === k));
+    };
+    thumbs.forEach((t, j) => { if (item.pages[j]) { t.onmouseenter = () => show(j); t.onmouseleave = () => show(0); } });
+    el.onmousemove = e => {
+      const r = el.getBoundingClientRect();
+      show(Math.min(item.pages.length - 1, Math.floor((e.clientX - r.left) / r.width * item.pages.length)));
+    };
+    el.onmouseleave = () => show(0);
+  }
+
+  // ───────── Сайдбар ─────────
+  document.querySelectorAll('.sidebar').forEach(side => {
+    const on = side.dataset.side;
+    side.innerHTML = `
+      <div class="logo" data-go="home">Fokus</div>
+      <div class="side-label">КОМАНДЫ <b>+</b></div>
+      <div class="side-gap"></div>
+      <div class="side-label">РЕСУРСЫ</div>
+      <button class="side-link${on === 'templates' ? ' active' : ''}" data-go="templates" data-filter="all">Шаблоны</button>
+      <button class="side-link">Обучение</button>
+      <button class="side-link">Месяц в подарок</button>
+      <button class="side-link">Примеры</button>
+      <button class="side-link">Отзывы</button>
+      <button class="side-link">Решения</button>
+      <button class="side-link">Тарифы</button>
+      <button class="side-link">Скидка</button>
+      <button class="side-link">ИИ-агент <span class="new">Нью</span></button>
+      <div class="side-foot">RU</div>`;
+  });
+
+  // ───────── А · Мои презентации ─────────
+  const presEl = document.getElementById('presentations');
+  function renderHome() {
+    presEl.innerHTML = `<div class="tiles">
+        <button class="tile" data-go="base" data-origin="home"><svg><use href="#i-spark"/></svg>ИИ</button>
+        <button class="tile"><svg><use href="#i-plus"/></svg>Создать</button>
+        <button class="tile" id="from-file"><svg><use href="#i-down"/></svg>Из файла</button>
+      </div>` + presentations.map(p => `
+      <div class="pcard" data-id="${p.id}">
+        <div class="pcover">${coverHTML(p, 0, true)}</div>
+        <div class="pinfo"><div><div class="ptitle">${esc(p.title)}</div><div class="pmeta">${p.meta}</div></div>
+          <button class="more" aria-label="Действия">•••</button></div>
+      </div>`).join('');
+    presEl.querySelectorAll('.pcard').forEach(card => {
+      const p = byId(card.dataset.id);
+      hoverPages(card.querySelector('.pcover'), p);
+      card.querySelector('.more').onclick = e => { e.stopPropagation(); openMenu(e.currentTarget, p); };
+    });
+    document.getElementById('from-file').onclick = () => uploadCompanyFile('home');
+  }
+  document.getElementById('home-templates').innerHTML = '';
+  function tcardHTML(t) {
+    const thumbs = [0, 1, 2].map(k => `<div class="thumb${k ? '' : ' sel'}" data-k="${k}">${t.pages && t.pages[k] ? `<img src="${t.pages[k]}" alt="">` : (k === 0 && t.css ? coverHTML(t) : '')}</div>`).join('');
+    const sub = `${t.slides} слайдов`;
+    return `<div class="tcard" data-tpl="${t.id}">
+      <div class="pcover">${coverHTML(t, 0, true)}</div>
+      <div class="thumbs">${thumbs}</div>
+      <div class="ptitle" style="margin-top:9px">${esc(t.title)}</div><div class="pmeta">${sub}</div></div>`;
+  }
+  function bindTcards(root) {
+    root.querySelectorAll('.tcard').forEach(c => {
+      const t = byId(c.dataset.tpl);
+      hoverPages(c.querySelector('.pcover'), t, [...c.querySelectorAll('.thumb')]);
+      c.onclick = () => openTemplate(t);
+    });
+  }
+  function renderHomeTemplates() {
+    const el = document.getElementById('home-templates');
+    el.innerHTML = LIB.slice(0, 4).map(tcardHTML).join('');
+    bindTcards(el);
+  }
+
+  // Меню «…»
+  const menu = document.getElementById('menu');
+  let menuItem = null;
+  function openMenu(btn, p) {
+    menuItem = p;
+    const sr = stage.getBoundingClientRect(), br = btn.getBoundingClientRect(), k = sr.width / stage.offsetWidth;
+    let left = (br.right - sr.left) / k - 20, top = (br.bottom - sr.top) / k + 6;
+    if (left + 210 > stage.offsetWidth - 10) left = stage.offsetWidth - 220;
+    if (top + 300 > stage.offsetHeight) top = (br.top - sr.top) / k - 300;
+    menu.style.left = left + 'px'; menu.style.top = top + 'px';
+    menu.classList.add('open');
+  }
+  document.addEventListener('click', e => { if (!e.target.closest('#menu')) menu.classList.remove('open'); });
+  document.getElementById('menu-add').onclick = () => { menu.classList.remove('open'); openAddModal(menuItem); };
+  menu.querySelectorAll('button:not(#menu-add)').forEach(b => b.onclick = () => { menu.classList.remove('open'); toast('В прототипе показан только пункт «Добавить в шаблоны»'); });
+
+  // «Из файла» — имитируем загрузку файла компании
+  let uploadThen = 'home';
+  function uploadCompanyFile(then) {
+    uploadThen = then;
+    if (presentations.some(p => p.id === 'company')) {
+      const p = byId('company');
+      if (then === 'templates') return openAddModal(p);
+      toast('Файл angik.pptx уже загружен');
+      return;
+    }
+    toast('Загружаем angik.pptx…');
+    setTimeout(() => {
+      presentations.unshift({ id: 'company', title: COMPANY_FILE.title, meta: 'загружено только что', slides: COMPANY_FILE.slides, pages: COMPANY_FILE.pages });
+      renderHome();
+      if (then === 'templates') openAddModal(byId('company'));
+      else toast('Файл angik.pptx загружен');
+    }, 900);
+  }
+
+  // ───────── Добавление в шаблоны ─────────
+  const addModal = document.getElementById('add-modal');
+  let addSource = null;
+  function openAddModal(p) {
+    addSource = p;
+    const pages = p.pages && p.pages.length ? p.pages : [null];
+    const show = k => {
+      document.getElementById('add-preview').innerHTML = coverHTML(p, k);
+      document.querySelectorAll('#add-strip .thumb').forEach((t, j) => t.classList.toggle('sel', j === k));
+    };
+    document.getElementById('add-strip').innerHTML = pages.length > 1
+      ? pages.map((src, k) => `<div class="thumb" data-k="${k}">${src ? `<img src="${src}" alt="">` : coverHTML(p)}</div>`).join('') : '';
+    document.querySelectorAll('#add-strip .thumb').forEach(t => t.onclick = () => show(+t.dataset.k));
+    show(0);
+    document.getElementById('add-slides').textContent = `${p.slides} слайдов`;
+    document.getElementById('add-name').value = p.title.replace(/\.(pptx?|pdf|key)$/i, '');
+    typo(addModal);
+    addModal.classList.add('open');
+    setTimeout(() => document.getElementById('add-name').select(), 50);
+  }
+  document.getElementById('add-cancel').onclick = document.getElementById('add-close').onclick = () => addModal.classList.remove('open');
+  addModal.onclick = e => { if (e.target === addModal) addModal.classList.remove('open'); };
+  document.getElementById('add-ok').onclick = () => {
+    const name = document.getElementById('add-name').value.trim() || addSource.title;
+    addModal.classList.remove('open');
+    parseTemplate(addSource, name);
+  };
+
+  // Разбор файла: в загруженном PDF/PPTX нужно найти заголовки, тексты и места для картинок
+  const PARSE_STEPS = ['Читаем слайды..', 'Находим заголовки и тексты..', 'Отмечаем места для картинок..', 'Запоминаем шрифты и цвета..'];
+  function parseTemplate(src, name) {
+    go('parse');
+    const text = document.getElementById('parse-text');
+    let i = 0;
+    const tick = () => {
+      if (current.dataset.screen !== 'parse') return;   // ушли с экрана — прерываем
+      if (i < PARSE_STEPS.length) { text.textContent = PARSE_STEPS[i++]; timer = setTimeout(tick, 1000); return; }
+      const id = 'mine' + (teamTemplates.length + 1);
+      teamTemplates.unshift({ id, team: true, title: name, slides: src.slides, pages: src.pages, css: src.css, tags: [] });
+      renderHomeTemplates();
+      tplFilter = 'team';
+      go('templates');
+      toast(`Шаблон «${name}» добавлен в «Мои шаблоны»`, 'Открыть', () => openTemplate(byId(id)));
+    };
+    tick();
+  }
+
+  // ───────── Б · Шаблоны ─────────
+  const CHIPS = [['Образование', 45], ['Оформление', 40], ['Показ', 36], ['Анализ', 32], ['Результаты', 24], ['Деловой', 19],
+    ['Стратегия', 16], ['Структура', 15], ['Креатив', 15], ['Визуализация', 14], ['Достижения', 13], ['Технологии', 13], ['Искусство', 13], ['IT', 12]];
+  function renderTemplates() {
+    document.getElementById('chips').innerHTML =
+      `<button class="chip team${tplFilter === 'team' ? ' active' : ''}" data-f="team">Мои шаблоны <span class="n">${teamTemplates.length}</span></button>` +
+      `<button class="chip${tplFilter === 'all' ? ' active' : ''}" data-f="all">Все</button>` +
+      CHIPS.map(([n, c]) => `<button class="chip${tplFilter === n ? ' active' : ''}" data-f="${n}">${n} <span class="n">${c}</span></button>`).join('');
+    document.querySelectorAll('#chips .chip').forEach(b => b.onclick = () => { tplFilter = b.dataset.f; renderTemplates(); });
+    const grid = document.getElementById('tgrid');
+    grid.parentNode.classList.toggle('mine', tplFilter === 'team');
+    if (tplFilter === 'team') {
+      grid.innerHTML = teamTemplates.map(tcardHTML).join('') +
+        (teamTemplates.length ? '' : `<p class="empty-note">Пока пусто</p>`);
+    } else {
+      const list = tplFilter === 'all' ? LIB : LIB.filter(t => t.tags.includes(tplFilter)).concat(LIB).filter((t, i, a) => a.indexOf(t) === i);
+      grid.innerHTML = list.map(tcardHTML).join('');
+    }
+    bindTcards(grid);
+  }
+
+  document.getElementById('upload-tpl').onclick = () => uploadCompanyFile('templates');
+
+  // ───────── В · Страница шаблона ─────────
+  function openTemplate(t) { pageTpl = t; pageIdx = 0; go('template-page'); }
+  function renderTemplatePage() {
+    const t = pageTpl;
+    const pages = t.pages && t.pages.length ? t.pages : [null];
+    document.getElementById('tpage').innerHTML = `
+      <div class="crumbs"><button data-go="templates" data-filter="${t.team ? 'team' : 'all'}">Шаблоны</button>${t.team ? ` › <button data-go="templates" data-filter="team">Мои шаблоны</button>` : ''} › ${esc(t.title)}</div>
+      <div class="tpage">
+        <div>
+          <div class="hero" id="hero">${coverHTML(t, pageIdx)}</div>
+          <div class="strip">${pages.map((src, k) => `<div class="thumb${k === pageIdx ? ' sel' : ''}" data-k="${k}">${src ? `<img src="${src}" alt="">` : coverHTML(t)}</div>`).join('')}</div>
+        </div>
+        <div class="tside">
+          <h1>${esc(t.title)}</h1>
+          <div class="slides">${t.slides} слайдов</div>
+          ${t.team ? '' : `<p class="desc">${esc(t.desc)}</p>
+          <div class="props">
+            <div><svg><use href="#i-star-o"/></svg>${esc(t.author)}</div>
+            <div><svg><use href="#i-font"/></svg>${esc(t.font)}</div>
+          </div>`}
+          <div class="actions">
+            <button class="btn btn-fill" data-go="base" data-origin="template-page" data-preset="${t.id}"><svg><use href="#i-spark"/></svg>Сгенерировать с ИИ</button>
+            <button class="btn btn-line" data-stub="Откроется копия шаблона в редакторе — заполнить вручную">Использовать шаблон</button>
+            <button class="btn btn-text" data-stub="Откроется просмотр всех слайдов шаблона">Смотреть шаблон</button>
+          </div>
+        </div>
+      </div>
+      ${t.team ? '' : `<div class="tpage-bottom">
+        <h3>Теги</h3>
+        <div class="chips" style="margin:0 0 40px">${t.tags.map(x => `<span class="chip">${x}</span>`).join('')}</div>
+        <h3>О шаблоне</h3>
+        <p>${esc(t.desc)} Шаблон можно использовать как основу: сгенерировать презентацию с ИИ или заполнить слайды вручную.</p>
+      </div>`}`;
+    document.querySelectorAll('#tpage .strip .thumb').forEach(th => th.onclick = () => { pageIdx = +th.dataset.k; renderTemplatePage(); });
+    document.querySelectorAll('#tpage [data-stub]').forEach(b => b.onclick = () => toast(b.dataset.stub + ' (в прототипе не показано)'));
+  }
+
+  // ───────── Темные экраны генерации ─────────
+  const STARS = [
+    [848, 146, 10, 124.8, 0], [1173, 213, 10, 134, 1], [1166.5, 209.5, 7, 212.86, 2],
+    [1272, 305, 28, 48.57, 3], [1362.5, 736.5, 27, 103.33, 4], [839.5, 541.5, 5, 318, 5],
+    [400.5, 765.5, 5, 299.6, 6], [553.5, 677.5, 13, 119.85, 7], [138, 530, 28, 48.57, 3],
+    [107, 399, 6, 226, 8], [382.5, 321.5, 3, 379.33, 9], [280, 271, 18, 67.56, 10], [51, 210, 2, 548, 11],
+  ];
+  document.querySelectorAll('.stars').forEach(layer => {
+    layer.innerHTML = STARS.map(([l, t, s, inset, f]) => {
+      const pad = s * inset / 100;
+      return `<div class="star" style="left:${l}px;top:${t}px;width:${s}px;height:${s}px">
+        <img src="${A}star${f}.svg" alt="" style="left:${-pad}px;top:${-pad}px;width:${s + 2 * pad}px;height:${s + 2 * pad}px"></div>`;
+    }).join('');
+  });
+
+  // Прогресс: со страницы шаблона шаг «Шаблон» не нужен, стиль задан шаблоном
+  function steps() {
+    return preset ? ['Основа презентации', 'Структура презентации', 'Генерация']
+                  : ['Основа презентации', 'Шаблон презентации', 'Структура презентации', 'Стиль'];
+  }
+  function renderProgress() {
+    document.querySelectorAll('[data-progress]').forEach(el => {
+      const list = steps();
+      const cur = el.dataset.progress === 'structure' ? list.indexOf('Структура презентации') : +el.dataset.progress;
+      el.innerHTML = list.map((label, i) => {
+        const mark = i === cur ? `<span class="label">${label}</span>` : `<img src="${A}${i < cur ? 'step-done' : 'step-upcoming'}.svg" alt="" title="${label}">`;
+        return (i ? '<span class="line"></span>' : '') + mark;
+      }).join('');
+    });
+  }
+
+  // ───────── Типографика: короткие предлоги и союзы не остаются в конце строки ─────────
+  const HANG = /(^|[\s«(—])(в|во|и|с|со|к|ко|о|об|от|до|на|по|за|из|у|не|ни|а|но|для|при|без|под|над|про|что|как|или)\s+/gi;
+  function typo(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const v = n.nodeValue.replace(HANG, (m, pre, word) => pre + word + ' ');
+      if (v !== n.nodeValue) n.nodeValue = v.replace(HANG, (m, pre, word) => pre + word + ' ');
+    }
+  }
+
+  new MutationObserver(list => list.forEach(m => m.addedNodes.forEach(n => {
+    if (n.nodeType === 1) typo(n);
+    else if (n.nodeType === 3 && n.parentNode) typo(n.parentNode);
+  }))).observe(document.getElementById('stage'), { childList: true, subtree: true });
+
+  // ───────── Навигация и масштаб ─────────
+  const stage = document.getElementById('stage');
+  let current = null, timer = null;
+  function fit() {
+    const w = +current.dataset.w, h = +current.dataset.h;
+    const light = current.classList.contains('light');
+    document.body.classList.toggle('is-light', light);
+    if (light) {
+      // Светлые экраны — по ширине окна, высота подстраивается, контент прокручивается
+      const k = innerWidth / w;
+      stage.style.width = w + 'px';
+      stage.style.height = innerHeight / k + 'px';
+      stage.style.transform = `scale(${k})`;
+    } else {
+      stage.style.width = w + 'px';
+      stage.style.height = h + 'px';
+      const k = Math.min(innerWidth / w, innerHeight / h);
+      stage.style.transform = `translate(-50%, -50%) scale(${k})`;
+    }
+  }
+  function go(name) {
+    if (name === 'after-base') name = preset ? 'loading-structure' : 'template';
+    if (name === 'back-from-base') name = baseOrigin;
+    if (name === 'back-from-structure') name = preset ? 'base' : 'template';
+    if (name === 'after-structure') name = preset || templateChosen ? 'loading-final' : 'style';
+    clearTimeout(timer);
+    menu.classList.remove('open');
+    document.getElementById('toast').classList.remove('show');
+    if (name === 'home') renderHome();
+    if (name === 'templates') renderTemplates();
+    if (name === 'template-page') renderTemplatePage();
+    if (name === 'template') renderCatalog();
+    renderProgress();
+    renderSource();
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.dataset.screen === name));
+    current = document.querySelector(`[data-screen="${name}"]`);
+    typo(current);
+    fit();
+    const main = current.querySelector('.main');
+    if (main) main.scrollTop = 0;
+    if (name === 'loading-structure') timer = setTimeout(() => go('structure'), 2200);
+    if (name === 'template') document.querySelector('.catalog').scrollTop = 0;
+    try { history.replaceState(null, '', '#' + name); } catch (e) {}
+  }
+  addEventListener('resize', fit);
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-go]');
+    if (!t) return;
+    if (t.dataset.template === 'none') templateChosen = false;
+    if (t.dataset.filter) tplFilter = t.dataset.filter;
+    if (t.dataset.origin) {
+      baseOrigin = t.dataset.origin;
+      preset = t.dataset.preset ? byId(t.dataset.preset) : null;
+      templateChosen = !!preset;
+    }
+    go(t.dataset.go);
+  });
+  document.getElementById('restart').onclick = () => {
+    preset = null; templateChosen = false; tplFilter = 'all';
+    go('home');
+  };
+
+  // Уведомление
+  const toastEl = document.getElementById('toast');
+  let toastTimer = null;
+  function toast(text, action, fn) {
+    toastEl.innerHTML = `<span>${esc(text)}</span>${action ? `<button>${action}</button>` : ''}`;
+    typo(toastEl);
+    if (action) toastEl.querySelector('button').onclick = () => { toastEl.classList.remove('show'); fn(); };
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), action ? 6000 : 3200);
+  }
+
+  // 1 · вкладки источника
+  const SETTINGS = {
+    topic: ['10 слайдов|113', 'Язык: Авто|135', 'Нейтральный стиль|173'],
+    text: ['10 слайдов|113', 'Язык: Авто|135', 'Сохранить текст|150'],
+    link: ['10 слайдов|113', 'Язык: Авто|135', 'Переписать текст|150', 'Нейтральный стиль|173'],
+    file: ['10 слайдов|113', 'Язык: Авто|135', 'Сохранить текст|150'],
+  };
+  const values = { topic: '', text: '', link: '' };
+  const source = document.getElementById('source');
+  const examples = document.getElementById('examples');
+  let tab = 'topic';
+  function renderSource() {
+    let entry;
+    if (tab === 'topic') entry = `<div class="entry"><input id="field" placeholder="Тема презентации"></div>`;
+    if (tab === 'text') entry = `<textarea id="field" placeholder="Любой текст, на основе которого нужно создать презентацию"></textarea>`;
+    if (tab === 'link') entry = `<div class="entry"><img src="${A}link.svg" alt=""><input id="field" placeholder="https://example.com"></div>`;
+    if (tab === 'file') entry = `<label class="upload"><div class="formats">${
+      [['DOC', '#2457e8'], ['PDF', '#e8402f'], ['PPT', '#f06a2b'], ['TXT', '#21b04b']].map(([n, c]) =>
+        `<div class="file"><img src="${A}file-outline.svg" alt=""><span class="badge" style="background:${c}">${n}</span></div>`).join('')
+    }</div><span class="upload-link" id="upload-name">Загрузить с компьютера</span>
+      <input type="file" hidden accept=".doc,.docx,.pdf,.ppt,.pptx,.txt"></label>`;
+    // Стиль задает шаблон — настройку стиля прячем
+    const settings = SETTINGS[tab].filter(s => !(preset && s.startsWith('Нейтральный'))).map(s => {
+      const [label, w] = s.split('|');
+      return `<button class="setting" style="width:${w}px"><span>${label}</span><img src="${A}expand.svg" alt=""></button>`;
+    }).join('');
+    source.innerHTML = entry + `<div class="settings">${settings}</div>`;
+    const field = document.getElementById('field');
+    if (field) { field.value = values[tab]; field.oninput = () => values[tab] = field.value; }
+    const file = source.querySelector('input[type=file]');
+    if (file) file.onchange = () => { if (file.files[0]) document.getElementById('upload-name').textContent = file.files[0].name; };
+    examples.style.display = tab === 'topic' ? '' : 'none';
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  }
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; renderSource(); });
+  document.querySelectorAll('.example').forEach(b => b.onclick = () => {
+    values.topic = b.textContent;
+    document.getElementById('field').value = b.textContent;
+  });
+
+  // 2 · каталог шаблонов в пути через ИИ: мои шаблоны — первыми
+  const CATS = [['Все', ''], ['Образование', 7], ['Оформление', 8], ['Показ', 9], ['Анализ', 3], ['Результаты', 3],
+    ['Деловой', 4], ['Стратегия', 3], ['Структура', 5], ['Креатив', 6], ['Визуализация', 5], ['Достижения', 3],
+    ['Технологии', 5], ['Искусство', 4], ['IT', 2], ['Коммуникация', 5], ['Преимущества', 4], ['Простота', 5]];
+  let catFilter = null;
+  function renderCatalog() {
+    if (catFilter === null || (catFilter === 'team' && !teamTemplates.length)) catFilter = teamTemplates.length ? 'team' : 'Все';
+    const catsEl = document.getElementById('categories');
+    catsEl.innerHTML = (teamTemplates.length ? `<button class="cat team${catFilter === 'team' ? ' active' : ''}" data-c="team"><span>Мои шаблоны</span><span class="count">${teamTemplates.length}</span></button>` : '') +
+      CATS.map(([n, c]) => `<button class="cat${catFilter === n ? ' active' : ''}" data-c="${n}"><span>${n}</span><span class="count">${c}</span></button>`).join('');
+    catsEl.querySelectorAll('.cat').forEach(b => b.onclick = () => { catFilter = b.dataset.c; renderCatalog(); });
+    const list = catFilter === 'team' ? teamTemplates : LIB;
+    const grid = document.getElementById('grid');
+    grid.innerHTML = list.map(t => `<div class="card" role="button" aria-label="${esc(t.title)}" data-tpl="${t.id}">${coverHTML(t, 0, true)}${t.team ? '<span class="owner">Мой</span>' : ''}</div>`).join('');
+    grid.querySelectorAll('.card').forEach(card => {
+      const t = byId(card.dataset.tpl);
+      hoverPages(card, t);
+      card.onclick = () => { templateChosen = true; go('loading-structure'); };
+    });
+  }
+
+  // 3 · структура
+  let slides = ['1. Загадочный сосед Земли: Что мы знаем о Марсе?', '2. История изучения Красной планеты: От мифов до миссий.',
+    '3. Особенности марсианского ландшафта и климата.', '4. Следы воды на Марсе: Прошлое и настоящее.',
+    '5. Возможность жизни на Марсе: Научные гипотезы и открытия.', '6. Технологии исследования Марса: Ровер Curiosity и другие миссии.',
+    '7. Элон Маск и колонизация Марса: Реальность или фантазия?', '8. Выживание человека на Марсе: Проблемы и перспективы.',
+    '9. Космический туризм: Ближайшие планы путешествий на Марс.', '10. Будущее человечества за пределами Земли: Зачем нам Марс?'];
+  const itemsEl = document.getElementById('items');
+  let dragFrom = null;
+  function renderItems() {
+    itemsEl.innerHTML = slides.map((s, i) => `<div class="item" data-i="${i}">
+      <img class="drag" src="${A}drag.svg" alt="" draggable="false">
+      <input value="${s.replace(/"/g, '&quot;')}">
+      <button class="remove" aria-label="Удалить"><img src="${A}remove.svg" alt=""></button></div>`).join('');
+    itemsEl.querySelectorAll('.item').forEach(item => {
+      const i = +item.dataset.i;
+      item.querySelector('input').oninput = e => slides[i] = e.target.value;
+      item.querySelector('.remove').onclick = () => { slides.splice(i, 1); renderItems(); };
+      const handle = item.querySelector('.drag');
+      handle.onmousedown = () => item.draggable = true;
+      item.ondragstart = () => { dragFrom = i; item.classList.add('dragging'); };
+      item.ondragend = () => { item.draggable = false; item.classList.remove('dragging'); };
+      item.ondragover = e => e.preventDefault();
+      item.ondrop = e => {
+        e.preventDefault();
+        if (dragFrom === null || dragFrom === i) return;
+        const [m] = slides.splice(dragFrom, 1);
+        slides.splice(i, 0, m);
+        dragFrom = null;
+        renderItems();
+      };
+    });
+  }
+  document.getElementById('add-item').onclick = () => {
+    if (slides.length >= 12) return;
+    slides.push(`${slides.length + 1}. Новый слайд`);
+    renderItems();
+    const inputs = itemsEl.querySelectorAll('input');
+    inputs[inputs.length - 1].select();
+  };
+  renderItems();
+
+
+  renderHome();
+  renderHomeTemplates();
+  // Состояние живет в памяти, поэтому при перезагрузке начинаем с «Моих презентаций»
+  go('home');
+</script>
+</body>
+</html>
